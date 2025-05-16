@@ -1,0 +1,52 @@
+name: 同步 Fork 并重命名文件
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天凌晨运行
+  workflow_dispatch: # 支持手动触发
+jobs:
+  sync-and-rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4 # 使用最新版本
+        with:
+          fetch-depth: 0 # 获取完整历史以便合并
+      - name: 配置 Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+      - name: 同步上游仓库
+        run: |
+          echo "添加上游仓库"
+          git remote add upstream https://github.com/Usu171/favorites.git || true
+          echo "获取上游分支"
+          git fetch upstream
+          echo "切换到 main 分支"
+          git checkout main
+          echo "合并上游 main 分支"
+          git merge upstream/main --no-ff --allow-unrelated-histories -m "合并上游 main 分支" || {
+            echo "合并冲突，取消合并"
+            git merge --abort
+            exit 1
+          }
+          echo "推送合并结果"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 重命名 HTML 文件为 index.html
+        run: |
+          echo "查找 HTML 文件"
+          HTML_FILE=$(find . -maxdepth 1 -type f -name "*.html" | head -n 1)
+          if [ -n "$HTML_FILE" ] && [ "$(basename "$HTML_FILE")" != "index.html" ]; then
+            echo "找到 HTML 文件: $HTML_FILE"
+            if [ -f "index.html" ]; then
+              echo "index.html 已存在，删除旧文件"
+              git rm -f index.html
+            fi
+            git mv "$HTML_FILE" index.html
+            git commit -m "将 $(basename "$HTML_FILE") 重命名为 index.html"
+            git push origin main
+            echo "重命名完成"
+          else
+            echo "未找到 HTML 文件或已命名为 index.html"
+          fi
