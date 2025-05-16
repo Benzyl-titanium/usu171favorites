@@ -19,18 +19,23 @@ jobs:
         run: |
           echo "添加上游仓库"
           git remote add upstream https://github.com/Usu171/favorites.git || true
-          echo "获取上游分支"
+          echo "验证远程仓库"
+          git remote -v
+          echo "拉取上游分支"
           git fetch upstream
+          echo "检查上游分支"
+          git branch -r
           echo "切换到 main 分支"
           git checkout main
           echo "合并上游 main 分支"
-          git merge upstream/main --no-ff --allow-unrelated-histories -m "合并上游 main 分支" || {
+          if git merge upstream/main --no-ff --allow-unrelated-histories -m "合并上游 main 分支"; then
+            echo "合并成功，推送更改"
+            git push origin main
+          else
             echo "合并冲突，取消合并"
             git merge --abort
             exit 1
-          }
-          echo "推送合并结果"
-          git push origin main
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: 重命名 HTML 文件为 index.html
@@ -44,8 +49,8 @@ jobs:
               git rm -f index.html
             fi
             git mv "$HTML_FILE" index.html
-            git commit -m "将 $(basename "$HTML_FILE") 重命名为 index.html"
-            git push origin main
+            git commit -m "将 $(basename "$HTML_FILE") 重命名为 index.html" || echo "无文件更改"
+            git push origin main || echo "无更改需要推送"
             echo "重命名完成"
           else
             echo "未找到 HTML 文件或已命名为 index.html"
